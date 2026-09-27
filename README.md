@@ -132,16 +132,34 @@ It still does not delete partitions, format disks, or launch the installer.
 
 ## Advanced CLI
 
+When installed in a project virtual environment, invoke the executable by path when using sudo. A plain `sudo cachy-migrator` usually fails because sudo uses a restricted PATH and does not inherit the activated virtualenv.
+
+Before using a work directory under `/mnt`, mount the intended filesystem there and confirm it:
+
+```bash
+lsblk -f
+findmnt /mnt/backup
+```
+
+For example:
+
+```bash
+sudo mkdir -p /mnt/backup
+sudo mount /dev/<backup-partition> /mnt/backup
+```
+
+Do not create `/mnt/backup` as a normal directory and assume it is the backup disk. Cachy Migrator now refuses a `/mnt/...` workdir unless it is backed by a mounted filesystem.
+
 Analyze attached drives:
 
 ```bash
-sudo cachy-migrator --analyze --workdir /mnt/backup/cachy-migration
+sudo .venv/bin/cachy-migrator --analyze --workdir /mnt/backup/cachy-migration
 ```
 
 Create a migration plan with explicit sources and destinations:
 
 ```bash
-sudo cachy-migrator --plan \
+sudo .venv/bin/cachy-migrator --plan \
   --workdir /mnt/backup/cachy-migration \
   --source /mnt/windows/Users \
   --source /mnt/linux-home/home \
@@ -153,7 +171,7 @@ Dry-run the approved non-destructive execution:
 
 ```bash
 HASH=$(cat /mnt/backup/cachy-migration/migration-plan.sha256)
-sudo cachy-migrator --execute \
+sudo .venv/bin/cachy-migrator --execute \
   --workdir /mnt/backup/cachy-migration \
   --confirm-plan-hash "$HASH" \
   --dry-run
@@ -163,7 +181,7 @@ Run the approved copy, verification, duplicate report, EFI snapshot, partition-t
 
 ```bash
 HASH=$(cat /mnt/backup/cachy-migration/migration-plan.sha256)
-sudo cachy-migrator --execute \
+sudo .venv/bin/cachy-migrator --execute \
   --workdir /mnt/backup/cachy-migration \
   --confirm-plan-hash "$HASH"
 ```
