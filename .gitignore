@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+analysis.json
+migration-plan.json
+migration-plan.sha256
+cachy-migrator.log
+rollback-manifest.json
