@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import shlex
 from pathlib import Path
 
 from .core import (
@@ -63,6 +64,55 @@ def print_plan_summary(plan: dict) -> None:
         print(f"WARNING: {warning}")
 
 
+
+def _sudo_hint() -> str:
+    python = shlex.quote(sys.executable)
+    return f"sudo {python} -m cachy_migrator.cli"
+
+
+def _prepare_workdir(raw_workdir: str) -> Path:
+    workdir = Path(raw_workdir).expanduser().resolve()
+
+    # Treat /mnt as an explicit mount namespace for migration media. Refuse to
+    # create a workdir there unless some ancestor below / is actually mounted.
+    if str(workdir).startswith("/mnt/"):
+        probe = workdir
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+
+        mounted = probe
+        while mounted != mounted.parent and not os.path.ismount(mounted):
+            mounted = mounted.parent
+
+        if mounted == Path("/"):
+            raise RuntimeError(
+                f"{workdir} is under /mnt, but no mounted filesystem backs that path. "
+                "Mount the intended backup/data partition first, then rerun. "
+                "Refusing to write migration state into the live root filesystem."
+            )
+
+    try:
+        workdir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:
+        raise RuntimeError(
+            f"Cannot create or write work directory {workdir}. "
+            f"If it is intentionally mounted and requires root, rerun with: "
+            f"{_sudo_hint()} <same arguments>"
+        ) from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Cannot create work directory {workdir}. Verify that the destination filesystem is mounted."
+        ) from exc
+
+    if not os.access(workdir, os.W_OK):
+        raise RuntimeError(
+            f"Work directory {workdir} is not writable. "
+            f"Use appropriate permissions or rerun with: {_sudo_hint()} <same arguments>"
+        )
+
+    return workdir
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Safety-first CachyOS migration planner")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -76,8 +126,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="show rsync work without writing migrated data")
     args = parser.parse_args(argv)
 
-    workdir = Path(args.workdir).resolve()
-    workdir.mkdir(parents=True, exist_ok=True)
+    try:
+        workdir = _prepare_workdir(args.workdir)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
     setup_logging(workdir / "cachy-migrator.log")
 
     if os.geteuid() != 0:
