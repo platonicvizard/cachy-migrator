@@ -2,6 +2,7 @@ from cachy_migrator.core import (
     Destination,
     canonical_json,
     classify_user_data,
+    filter_safe_destinations,
     plan_copy_operations,
     plan_hash,
 )
@@ -50,6 +51,20 @@ def test_plan_copy_operations_warns_when_capacity_is_insufficient():
 
     assert operations == []
     assert "No destination has enough usable free space" in warnings[0]
+
+
+def test_filter_safe_destinations_rejects_destinations_inside_sources(tmp_path):
+    source = tmp_path / "source"
+    nested_destination = source / "backup"
+    separate_destination = tmp_path / "separate"
+    source.mkdir()
+    nested_destination.mkdir()
+    separate_destination.mkdir()
+
+    safe, warnings = filter_safe_destinations([source], [nested_destination, separate_destination])
+
+    assert safe == [str(separate_destination.resolve())]
+    assert "skipped to avoid recursive copy" in warnings[0]
 
 
 def _item(source, relative_path, category, size):

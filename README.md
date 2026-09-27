@@ -109,7 +109,28 @@ sudo apt install python3 python3-venv python3-pip rsync smartmontools jdupes rdf
 
 WSL2 should not be used for destructive disk replacement workflows. Boot a CachyOS/Linux live USB for physical disk migration.
 
-## CLI
+## One-Command Interactive Flow
+
+For the normal migration workflow, boot the CachyOS live USB, mount the source and destination partitions, then run one command:
+
+```bash
+sudo cachy-migrator --workdir /mnt/backup/cachy-migration
+```
+
+If you run `cachy-migrator` with no mode flags, it starts the interactive workflow automatically. The wizard:
+
+1. Analyzes attached drives.
+2. Shows disk health, OS markers, and the recommended CachyOS target.
+3. Detects mounted source and destination paths.
+4. Lets you accept discovered paths or enter paths manually.
+5. Writes `analysis.json`, `migration-plan.json`, and `migration-plan.sha256`.
+6. Runs a dry-run first.
+7. Requires plan-hash confirmation before the real copy.
+8. Runs duplicate reporting, partition-table backups, EFI snapshots, `rsync` copy, checksum verification, and rollback manifest generation.
+
+It still does not delete partitions, format disks, or launch the installer.
+
+## Advanced CLI
 
 Analyze attached drives:
 
@@ -166,11 +187,11 @@ The generated files are:
 3. Mount source partitions read-only when possible.
 4. Mount destination partitions read-write.
 5. Install runtime tools if they are missing.
-6. Run `--analyze` and review disk health, OS markers, and target scoring.
-7. Run `--plan` with explicit `--source` and `--destination` roots.
-8. Inspect `migration-plan.json`, `migration-plan.sha256`, and warnings.
-9. Run `--execute --dry-run --confirm-plan-hash <HASH>`.
-10. Run `--execute --confirm-plan-hash <HASH>`.
+6. Run `sudo cachy-migrator --workdir /mnt/backup/cachy-migration`.
+7. Accept discovered source/destination paths or enter them manually.
+8. Review the generated plan summary and warnings.
+9. Let the wizard run the dry-run.
+10. Confirm the plan hash prefix when ready for the real copy.
 11. Review `rollback-manifest.json`.
 12. Independently verify that migrated data is readable.
 13. Only after successful verification, proceed with manual CachyOS installer partitioning.

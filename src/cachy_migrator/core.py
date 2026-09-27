@@ -427,6 +427,27 @@ def destination_inventory(destination_roots: list[str | Path]) -> list[Destinati
     return destinations
 
 
+def filter_safe_destinations(
+    source_roots: list[str | Path],
+    destination_roots: list[str | Path],
+) -> tuple[list[str], list[str]]:
+    safe: list[str] = []
+    warnings: list[str] = []
+    resolved_sources = [Path(source).expanduser().resolve() for source in source_roots]
+    for destination_value in destination_roots:
+        destination = Path(destination_value).expanduser().resolve()
+        overlap = next((source for source in resolved_sources if _same_or_nested(destination, source)), None)
+        if overlap is not None:
+            warnings.append(f"Destination {destination} is inside selected source {overlap}; skipped to avoid recursive copy")
+            continue
+        safe.append(str(destination))
+    return safe, warnings
+
+
+def _same_or_nested(path: Path, parent: Path) -> bool:
+    return path == parent or parent in path.parents
+
+
 def plan_copy_operations(items: list[UserDataItem], destinations: list[Destination]) -> tuple[list[dict[str, Any]], list[str]]:
     operations: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -552,7 +573,10 @@ def plan_from_analysis(
     alternatives = healthy[1:]
     workdir_path = Path(workdir).resolve()
     source_values = list(source_roots or mounted_user_sources(analysis))
-    destination_values = list(destination_roots or mounted_destinations(analysis))
+    destination_values, destination_warnings = filter_safe_destinations(
+        source_values,
+        list(destination_roots or mounted_destinations(analysis)),
+    )
     classified = classify_user_data(source_values) if source_values else []
     destinations = destination_inventory(destination_values) if destination_values else []
     copy_operations, placement_warnings = plan_copy_operations(classified, destinations)
@@ -582,7 +606,7 @@ def plan_from_analysis(
             ],
         },
         "rollback_manifest": str(workdir_path / "rollback-manifest.json"),
-        "warnings": list(analysis.get("warnings", [])) + placement_warnings,
+        "warnings": list(analysis.get("warnings", [])) + destination_warnings + placement_warnings,
     }
 
     if target:

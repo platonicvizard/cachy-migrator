@@ -21,6 +21,8 @@ Planning produces canonical JSON plus a SHA-256 approval hash. The plan separate
 
 Planning remains read-only. The only inputs that should materially change a plan are disk state, selected `--source` roots, selected `--destination` roots, and the work directory used for report paths.
 
+The primary user interface is an interactive one-command flow. Running `cachy-migrator` without `--analyze`, `--plan`, or `--execute` performs analysis, prompts for source and destination paths, writes the plan, runs a dry-run, and then requires a short plan-hash confirmation before real copy execution. The staged flags remain available for automation and debugging.
+
 ## Phase 3 - Migrate User Data
 
 The migration engine classifies and places:
