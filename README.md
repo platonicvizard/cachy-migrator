@@ -34,7 +34,7 @@ The project is designed for a CachyOS or Arch-based live environment when real d
 ## Install From Source
 
 ```bash
-git clone <repo-url> cachy-migrator
+git clone https://github.com/<owner>/cachy-migrator.git cachy-migrator
 cd cachy-migrator
 python -m venv .venv
 source .venv/bin/activate
@@ -42,10 +42,12 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
+Replace `https://github.com/<owner>/cachy-migrator.git` with the real repository URL.
+
 On Windows PowerShell:
 
 ```powershell
-git clone <repo-url> cachy-migrator
+git clone https://github.com/<owner>/cachy-migrator.git cachy-migrator
 cd cachy-migrator
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -111,10 +113,10 @@ WSL2 should not be used for destructive disk replacement workflows. Boot a Cachy
 
 ## One-Command Interactive Flow
 
-For the normal migration workflow, boot the CachyOS live USB, mount the source and destination partitions, then run one command:
+For the normal migration workflow, boot the CachyOS live USB, clone/install the project, mount the source and destination partitions, then run one command from the project directory:
 
 ```bash
-sudo cachy-migrator --workdir /mnt/backup/cachy-migration
+sudo ./.venv/bin/cachy-migrator --workdir /mnt/backup/cachy-migration
 ```
 
 If you run `cachy-migrator` with no mode flags, it starts the interactive workflow automatically. The wizard:
@@ -153,13 +155,13 @@ Do not create `/mnt/backup` as a normal directory and assume it is the backup di
 Analyze attached drives:
 
 ```bash
-sudo .venv/bin/cachy-migrator --analyze --workdir /mnt/backup/cachy-migration
+sudo ./.venv/bin/cachy-migrator --analyze --workdir /mnt/backup/cachy-migration
 ```
 
 Create a migration plan with explicit sources and destinations:
 
 ```bash
-sudo .venv/bin/cachy-migrator --plan \
+sudo ./.venv/bin/cachy-migrator --plan \
   --workdir /mnt/backup/cachy-migration \
   --source /mnt/windows/Users \
   --source /mnt/linux-home/home \
@@ -171,7 +173,7 @@ Dry-run the approved non-destructive execution:
 
 ```bash
 HASH=$(cat /mnt/backup/cachy-migration/migration-plan.sha256)
-sudo .venv/bin/cachy-migrator --execute \
+sudo ./.venv/bin/cachy-migrator --execute \
   --workdir /mnt/backup/cachy-migration \
   --confirm-plan-hash "$HASH" \
   --dry-run
@@ -181,7 +183,7 @@ Run the approved copy, verification, duplicate report, EFI snapshot, partition-t
 
 ```bash
 HASH=$(cat /mnt/backup/cachy-migration/migration-plan.sha256)
-sudo .venv/bin/cachy-migrator --execute \
+sudo ./.venv/bin/cachy-migrator --execute \
   --workdir /mnt/backup/cachy-migration \
   --confirm-plan-hash "$HASH"
 ```
@@ -202,17 +204,36 @@ The generated files are:
 
 1. Boot the CachyOS live USB.
 2. Connect every source and destination drive.
-3. Mount source partitions read-only when possible.
-4. Mount destination partitions read-write.
-5. Install runtime tools if they are missing.
-6. Run `sudo cachy-migrator --workdir /mnt/backup/cachy-migration`.
-7. Accept discovered source/destination paths or enter them manually.
-8. Review the generated plan summary and warnings.
-9. Let the wizard run the dry-run.
-10. Confirm the plan hash prefix when ready for the real copy.
-11. Review `rollback-manifest.json`.
-12. Independently verify that migrated data is readable.
-13. Only after successful verification, proceed with manual CachyOS installer partitioning.
+3. Install runtime tools if they are missing.
+4. Clone this project and install it in a virtualenv.
+5. Mount source partitions read-only when possible.
+6. Mount the backup/destination partition read-write.
+7. Run `sudo ./.venv/bin/cachy-migrator --workdir /mnt/backup/cachy-migration` from the project directory.
+8. Accept discovered source/destination paths or enter them manually.
+9. Review the generated plan summary and warnings.
+10. Let the wizard run the dry-run.
+11. Confirm the plan hash prefix when ready for the real copy.
+12. Review `rollback-manifest.json`.
+13. Independently verify that migrated data is readable.
+14. Only after successful verification, proceed with manual CachyOS installer partitioning.
+
+Minimal CachyOS live-USB command sequence:
+
+```bash
+sudo pacman -Syu git python python-pip rsync smartmontools jdupes rdfind gptfdisk util-linux
+git clone https://github.com/<owner>/cachy-migrator.git cachy-migrator
+cd cachy-migrator
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+
+lsblk -f
+sudo mkdir -p /mnt/backup
+sudo mount /dev/<backup-partition> /mnt/backup
+
+sudo ./.venv/bin/cachy-migrator --workdir /mnt/backup/cachy-migration
+```
 
 ## Mounting Examples
 
@@ -242,6 +263,31 @@ Mount a backup destination:
 sudo mkdir -p /mnt/backup-drive-a
 sudo mount /dev/sdb1 /mnt/backup-drive-a
 ```
+
+## Common Command Failures
+
+`sudo cachy-migrator: command not found`
+
+Use the virtualenv executable from the project directory:
+
+```bash
+sudo ./.venv/bin/cachy-migrator --workdir /mnt/backup/cachy-migration
+```
+
+`ERROR: /mnt/... is under /mnt, but no mounted filesystem backs that path`
+
+Mount the real backup partition first. The tool refuses to write migration state into the live USB root filesystem by accident.
+
+```bash
+lsblk -f
+sudo mkdir -p /mnt/backup
+sudo mount /dev/<backup-partition> /mnt/backup
+findmnt /mnt/backup
+```
+
+`git clone <repo-url>` fails
+
+`<repo-url>` is a placeholder. Use the real GitHub repository URL.
 
 ## Development
 
